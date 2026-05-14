@@ -94,14 +94,20 @@ learnable_prototypes_model.eval()
 with torch.no_grad():
     prototypes = learnable_prototypes_model()
 
-    for sam_feats, mask_names, cls_ids, _, _ in dataloader: 
+    # Updated unpack signature for temporal pairs from the modified dataset
+    for sam_feats_1, sam_feats_2, mask_names_1, mask_names_2, cls_ids, _, _, _ in dataloader: 
         
-        sam_feats = sam_feats.cuda()
+        sam_feats_1 = sam_feats_1.cuda()
+        sam_feats_2 = sam_feats_2.cuda()
         cls_ids = cls_ids.cuda()    
                 
-        preds , preds_quality = model_forward_function(protoype_prompt_encoder, sam_prompt_encoder, sam_decoder, sam_feats, prototypes, cls_ids)    
- 
-        binary_masks = create_binary_masks(binary_masks, preds, preds_quality, mask_names, thr)
+        # Inference for Frame 1 (ignoring the returned sparse embeddings with '_')
+        preds_1 , preds_quality_1, _ = model_forward_function(protoype_prompt_encoder, sam_prompt_encoder, sam_decoder, sam_feats_1, prototypes, cls_ids)    
+        binary_masks = create_binary_masks(binary_masks, preds_1, preds_quality_1, mask_names_1, thr)
+
+        # Inference for Frame 2 
+        preds_2 , preds_quality_2, _ = model_forward_function(protoype_prompt_encoder, sam_prompt_encoder, sam_decoder, sam_feats_2, prototypes, cls_ids)    
+        binary_masks = create_binary_masks(binary_masks, preds_2, preds_quality_2, mask_names_2, thr)
 
 endovis_masks = create_endovis_masks(binary_masks, 1024, 1280)
 endovis_results = eval_endovis(endovis_masks, gt_endovis_masks)

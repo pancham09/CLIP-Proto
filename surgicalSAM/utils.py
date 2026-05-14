@@ -6,20 +6,12 @@ import os.path as osp
 import re 
 
 
-
 def create_binary_masks(binary_masks, preds, preds_quality, mask_names, thr):
-
-    """Gather the predicted binary masks of different frames and classes into a dictionary, mask quality is also recorded
-
-    Returns:
-        dict: a dictionary containing all predicted binary masks organised based on sequence, frame, and mask name
-    """
     preds = preds.cpu()
     preds_quality = preds_quality.cpu()
     
     pred_masks = (preds > thr).int()
     
-
     for pred_mask, mask_name, pred_quality in zip(pred_masks, mask_names, preds_quality):        
       
         seq_name = mask_name.split("/")[0]
@@ -31,25 +23,20 @@ def create_binary_masks(binary_masks, preds, preds_quality, mask_names, thr):
         if frame_name not in binary_masks[seq_name].keys():
             binary_masks[seq_name][frame_name] = list()
             
-        binary_masks[seq_name][frame_name].append({
-            "mask_name": mask_name,
-            "mask": pred_mask,
-            "mask_quality": pred_quality.item()
-        })
+        # MODIFIED: Check if this exact mask_name (which includes the class ID) already exists
+        # This prevents duplicate entries caused by the overlapping temporal pairs
+        existing_masks = [m["mask_name"] for m in binary_masks[seq_name][frame_name]]
+        
+        if mask_name not in existing_masks:
+            binary_masks[seq_name][frame_name].append({
+                "mask_name": mask_name,
+                "mask": pred_mask,
+                "mask_quality": pred_quality.item()
+            })
         
     return binary_masks
-        
 
 def create_endovis_masks(binary_masks, H, W):
-    """given the dictionary containing all predicted binary masks, compute final prediction of each frame and organise the prediction masks into a dictionary
-       H - height of image 
-       W - width of image
-    
-    Returns: a dictionary containing one prediction mask for each frame with the frame name as key and its predicted mask as value; 
-             For each frame, the binary masks of different classes are conbined into a single prediction mask;
-             The prediction mask for each frame is a 1024 x 1280 map with each value representing the class id for the pixel;
-             
-    """
     
     endovis_masks = dict()
     
@@ -77,18 +64,6 @@ def create_endovis_masks(binary_masks, H, W):
 
 
 def eval_endovis(endovis_masks, gt_endovis_masks):
-    """Given the predicted masks and groundtruth annotations, predict the challenge IoU, IoU, mean class IoU, and the IoU for each class
-        
-      ** The evaluation code is taken from the official evaluation code of paper: ISINet: An Instance-Based Approach for Surgical Instrument Segmentation
-      ** at https://github.com/BCV-Uniandes/ISINet
-      
-    Args:
-        endovis_masks (dict): the dictionary containing the predicted mask for each frame 
-        gt_endovis_masks (dict): the dictionary containing the groundtruth mask for each frame 
-
-    Returns:
-        dict: a dictionary containing the evaluation results for different metrics 
-    """
 
     endovis_results = dict()
     num_classes = 7
@@ -174,12 +149,6 @@ def compute_mask_IU_endovis(masks, target):
 def read_gt_endovis_masks(data_root_dir = "../data/endovis_2018",
                           mode = "val", 
                           fold = None):
-    
-    """Read the annotation masks into a dictionary to be used as ground truth in evaluation.
-
-    Returns:
-        dict: mask names as key and annotation masks as value 
-    """
     gt_endovis_masks = dict()
     
     if "2018" in data_root_dir:
@@ -215,8 +184,6 @@ def read_gt_endovis_masks(data_root_dir = "../data/endovis_2018",
 
 
 def print_log(str_to_print, log_file):
-    """Print a string and meanwhile write it to a log file
-    """
     print(str_to_print)
     with open(log_file, "a") as file:
         file.write(str_to_print+"\n")

@@ -192,3 +192,16 @@ class DiceLoss(nn.Module):
       
         return loss
 
+def temporal_consistency_loss(sparse_prompt_1, sparse_prompt_2):
+    """
+    Forces the sparse embeddings of the same tool across two consecutive frames to match.
+    """
+    # Flatten the embeddings to (Batch * Tokens, 256) so CosineEmbeddingLoss can read them
+    flat_prompt_1 = sparse_prompt_1.view(-1, sparse_prompt_1.size(-1))
+    flat_prompt_2 = sparse_prompt_2.view(-1, sparse_prompt_2.size(-1))
+    
+    # We want the similarity to be exactly 1 (perfect match)
+    target = torch.ones(flat_prompt_1.size(0)).to(flat_prompt_1.device)
+    loss_fn = torch.nn.CosineEmbeddingLoss()
+    
+    return loss_fn(flat_prompt_1, flat_prompt_2, target)
